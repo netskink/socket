@@ -1,2 +1,2 @@
-int test_one(void);
+int test_one(char *pchProgName);
 

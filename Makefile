@@ -48,8 +48,8 @@ clean:
 	-rm -f $(TARGET_SRV)
 	-rm -f $(TARGET_CLI)
 
-test:
-	./$(TARGET_SRV) ; 
+test: all
+	./$(TARGET_SRV) 
 
 
 

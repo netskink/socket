@@ -21,7 +21,7 @@ void write_to_server (int filedes) {
 	nbytes = write (filedes, MESSAGE, strlen (MESSAGE) + 1);
 	if (nbytes < 0) {
 		perror ("write");
-	exit (EXIT_FAILURE);
+		exit (EXIT_FAILURE);
 	}
 }
      
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
 		exit(iRC);
 	}
 
-	test_one();
+	test_one(argv[0]);
 
 /*
 	socket
@@ -70,6 +70,10 @@ int main(int argc, char *argv[]) {
 
 	/* Send data to the server. */
 	write_to_server (sockfd);
+
+//	printf("Socket held open, hit return to close and exit.\n");
+//	getchar();
+
 	close (sockfd);
 
 

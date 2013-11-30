@@ -7,8 +7,8 @@
  * These are primative unit tests.
  */
 
-int test_one(void) {
-	printf("Common test one\n");
+int test_one(char *pchProgName) {
+	printf("This is %s\n",pchProgName);
 	return 0;
 }
 

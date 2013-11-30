@@ -20,15 +20,14 @@
 #include "unit.h"
 #include "common.h"
 
-#define MAXMSG  512
 
 
 
 int read_from_client (int filedes) {
-	char buffer[MAXMSG];
+	char buffer[coniMaxMsg];
 	int nbytes;
 
-	nbytes = read (filedes, buffer, MAXMSG);
+	nbytes = read (filedes, buffer, coniMaxMsg);
 	if (nbytes < 0) {
 		/* Read error. */
 		perror ("read");
@@ -46,7 +45,8 @@ int read_from_client (int filedes) {
 int main(int argc, char *argv[]) {
 
 	int iRC;
-	int sockfd;
+	int sockfd; /* the socket we open for server */
+	int newfd;	/* the socket we open for accept */
     fd_set active_fd_set;
     fd_set read_fd_set;
     int i;
@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
 		exit(iRC);
 	}
 
-	test_one();
+	test_one(argv[0]);
 
 /*
 	The sequence for a server socket is:
@@ -151,8 +151,15 @@ int main(int argc, char *argv[]) {
 
 		/* Service all the sockets with input pending. */
 		for (i = 0; i < FD_SETSIZE; ++i) {
+			/* this code will iterate through all 1K file descriptors.
+			 * considering we only have at most two, this seems a waste of effort.
+			 */
+			//printf("in for loop %d\n",i);
 			if (FD_ISSET (i, &read_fd_set)) {
 				if (i == sockfd) {
+					char *pchBuffer;
+			        uint16_t uhPort;
+
 
 					/* Connection request on original socket. */
 					/*
@@ -176,31 +183,59 @@ int main(int argc, char *argv[]) {
 				      Upon successful completion, accept() shall return the non-negative file descriptor of the
        				  accepted socket. Otherwise, -1 shall be returned and errno set to indicate the error.
 					 */
-					int newfd;
 					size = sizeof (clientname);
 					newfd = accept (sockfd, (struct sockaddr *) &clientname, &size);
 					if (newfd < 0) {
 						perror ("accept");
 						exit (EXIT_FAILURE);
 					}
+					
+					/*
+					char *inet_ntoa(struct in_addr in);
+					The inet_ntoa() function converts the Internet host address in, given in network byte
+			        order, to a string in IPv4 dotted-decimal notation.  The string is returned in a 
+					statically allocated buffer, which subsequent calls will overwrite.
+	
+			        uint16_t htons(uint16_t hostshort);
+			        The htons() function converts the unsigned short integer hostshort from host byte 
+				    order to network byte order.
+					*/
+					
 
-					fprintf (stderr, "Server: connect from host %s, port %hd.\n",
-						inet_ntoa (clientname.sin_addr),
-						ntohs (clientname.sin_port));
+					pchBuffer = inet_ntoa (clientname.sin_addr);
+			        uhPort = ntohs (clientname.sin_port);
+
+					fprintf (stderr, "Server: connect from host %s, port %hu.\n",pchBuffer,uhPort);
+					// add the newfd to the set of file descriptors to poll.
 					FD_SET (newfd, &active_fd_set);
-				} else {
+					
+					continue;
+				} /* handle listen socket file descriptor */
+
+				if (i == newfd) {
 					/* Data arriving on an already-connected socket. */
-					if (read_from_client (i) < 0) {
-						close (i);
-						FD_CLR (i, &active_fd_set);
+					if (read_from_client (newfd) < 0) {
+						close (newfd);
+						FD_CLR (newfd, &active_fd_set);
 					}
-				}
+					continue;
+				} /* handle accept socket file descriptor */
+
+				// Added a continue to each of the if clauses above, so that
+				// if we reach here, we have an error condition where
+				// we have input from a fd we don't know about.
+
+				perror("We have some fd set which is not what we are looking for?\n");
+				iRC = EXIT_FAILURE;
+				goto early_exit;
+				
 			}
 		}
 
 	}
 
 	printf("Normal exit\n");
+early_exit:
 	exit(iRC);
 
 }

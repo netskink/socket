@@ -56,3 +56,6 @@ void init_sockaddr (struct sockaddr_in *name, const char *hostname, uint16_t por
 	}
 	name->sin_addr = *(struct in_addr *) hostinfo->h_addr;
 }
+
+
+
