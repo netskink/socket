@@ -93,9 +93,57 @@ int main(int argc, char *argv[]) {
 	FD_SET (sockfd, &active_fd_set);
 
 	while (1) {
+
+		/* 
+		 Select monitors multiple file descriptos, waiting until one or
+		 more of the file descriptos become "ready" for some class of
+  		 I/O operation. A file descriptor is considered ready if it is 
+ 		 possible to perform the corresponding I/O operation (eg. read())
+		 without blocking.
+
+		 Three  independent  sets of file descriptors are watched.  
+		 1. Those listed in readfds will be watched to see if characters 
+		   become available for reading (more precisely,  to  see  if  a
+           read will not block; in particular, a file descriptor is also 
+		   ready on end-of-file). 
+		 
+		 2. Those in writefds will be watched to see if a write will not block. 
+		  
+		 3. Those in exceptfds will be watched for exceptions.  
+		 
+		 On exit, the sets are modified in place to indicate which file
+       	 descriptors actually changed status.  
+		 
+		 Each of the three file descriptor sets may be specified as NULL if no 
+		 file descriptors are to be watched for the corresponding class of events.
+
+		 Four macros are provided to manipulate the sets.  
+		  FD_ZERO() clears a  set.   
+		  FD_SET()  and FD_CLR() respectively add and remove a given file 
+		  	descriptor from a set.  
+		  FD_ISSET() tests to see if a file descriptor is part of the set; 
+		   this is useful after select() returns.
+
+       	 nfds is the highest-numbered file descriptor in any of the three sets, plus 1.
+
+         The timeout argument specifies the interval that select() should block 
+		 waiting for a file descriptor to become ready.  This interval will be 
+		 rounded up to the system clock granularity, and kernel scheduling delays 
+		 mean that the blocking interval may overrun by a small amount.  If both 
+		 fields of the timeval structure are zero, then select() returns immediately.  
+		 (This is useful for polling.)  If timeout is NULL (no timeout), select() can
+         block indefinitely.
+
+
+		 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+		 */
+
+		//printf("blocking on following select call\n");
+
 		/* Block until input arrives on one or more active sockets. */
 		read_fd_set = active_fd_set;
-		iRC = select (FD_SETSIZE, &read_fd_set, NULL, NULL, NULL);
+		iRC = select (FD_SETSIZE, &read_fd_set, /*write*/NULL, /*exception*/NULL, /*timeout*/NULL);
+		/* blocked above until the fd set can read */
 		if (iRC < 0) {
 			perror ("select");
 			exit (EXIT_FAILURE);
@@ -107,24 +155,44 @@ int main(int argc, char *argv[]) {
 				if (i == sockfd) {
 
 					/* Connection request on original socket. */
-					int new;
-					size = sizeof (clientname);
-					new = accept (sockfd, (struct sockaddr *) &clientname, &size);
+					/*
+					   int accept(int socket, struct sockaddr *restrict address, socklen_t *restrict address_len);
 
-					if (new < 0) {
+				       The  accept()  function shall extract the first connection on the queue of pending 
+					   connections, create a new socket with the same socket type protocol and address
+					   family as the specified socket, and allocate a new file descriptor for that socket.
+
+       				   The accept() function takes the following arguments:
+
+       				   socket - Specifies a socket that was created with socket(), has been bound to 
+					   an address with bind(), and has issued a successful call to listen().
+
+       				  address - Either a null pointer, or a pointer to a sockaddr structure where the  
+					  address of the connecting socket shall be returned.
+
+       				  address_len - Points to a socklen_t structure which on input specifies the length of 
+					  the supplied sockaddr structure, and on output specifies the length of the stored address.
+
+				      Upon successful completion, accept() shall return the non-negative file descriptor of the
+       				  accepted socket. Otherwise, -1 shall be returned and errno set to indicate the error.
+					 */
+					int newfd;
+					size = sizeof (clientname);
+					newfd = accept (sockfd, (struct sockaddr *) &clientname, &size);
+					if (newfd < 0) {
 						perror ("accept");
 						exit (EXIT_FAILURE);
 					}
 
 					fprintf (stderr, "Server: connect from host %s, port %hd.\n",
-					inet_ntoa (clientname.sin_addr),
-					ntohs (clientname.sin_port));
-					FD_SET (new, &active_fd_set);
+						inet_ntoa (clientname.sin_addr),
+						ntohs (clientname.sin_port));
+					FD_SET (newfd, &active_fd_set);
 				} else {
 					/* Data arriving on an already-connected socket. */
 					if (read_from_client (i) < 0) {
-							close (i);
-							FD_CLR (i, &active_fd_set);
+						close (i);
+						FD_CLR (i, &active_fd_set);
 					}
 				}
 			}
